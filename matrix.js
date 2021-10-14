@@ -41,8 +41,12 @@ class Matrix {
 	}
 
 	//scalar multiplication
-	multiply = (n) => {
-		this.data = this.data.map((row) => row.map((value) => value * n));
+	scalarMultiply = (n) => {
+		if (n instanceof Matrix) {
+			this.data = this.data.map((row, i) => row.map((value, j) => value * n.data[i][j]));
+		} else {
+			this.data = this.data.map((row) => row.map((value) => value * n));
+		}
 		this.updateSize();
 	};
 
@@ -91,7 +95,14 @@ class Matrix {
 
 	map(callback) {
 		this.data = this.data.map((row, i) => row.map((value, j) => callback(value, i, j)));
-		this.updateSize();
+	}
+
+	static map(m, callback) {
+		let result = new Matrix(m.rows, m.cols);
+		result.data = result.data.map((row, i) =>
+			row.map((value, j) => callback(m.data[i][j], i, j))
+		);
+		return result;
 	}
 
 	randomize = () => {
