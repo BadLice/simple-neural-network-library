@@ -16,6 +16,8 @@ class NeuralNetwork {
 		this.bias_h = Matrix.fromArray(Array.from({ length: this.hiddenNodes }, () => 1));
 		//bias of output layer
 		this.bias_o = Matrix.fromArray(Array.from({ length: this.outputNodes }, () => 1));
+
+		this.learningRate = 0.1;
 	}
 
 	// https://www.youtube.com/watch?v=MPmLWsHzPlU&list=PLRqwX-V7Uu6Y7MdSCaIfsxc561QI0U0Tb&index=13
@@ -50,18 +52,70 @@ class NeuralNetwork {
 	}
 
 	// https://www.youtube.com/watch?v=r2-P1Fi1g60&list=PLRqwX-V7Uu6Y7MdSCaIfsxc561QI0U0Tb&index=15
-	train(inputs, targets) {
-		let outputs = Matrix.fromArray(this.feedforward(inputs));
-		targets = Matrix.fromArray(targets);
+	//stocastic training -> calculate the error and adjust the weights for every single set of inputs (opposite of batch training)
+	train(inputArray, targetsArray) {
+		//BACKPROPAGATION of the error using this equations (ΔW = change to apply to the weights, g = activation function (here its derivative g' is used), error = error calculated in the next layer (if i'm in hidden i take error of output for example), lr = learning rate, input = the input of the previous layer, i = previous layer,j = next layer, * = scalar/hadamard product, • = vectorial product)
+		// F1: ΔWij = [lr * error_j * g'(x_j)] • transposed(input_i) -> deltas for weights
+		//					↑gradient↑
+		// F2: ΔBj = [lr * error_j * g'(x_j)] -> deltas for biases
+
+		//rerun the feedforward algorythm
+		let inputs = Matrix.fromArray(inputArray);
+		let hidden = Matrix.multiply(this.weights_ih, inputs); //this is H
+		hidden.add(this.bias_h);
+		hidden.map(sigmoid);
+		let outputs = Matrix.multiply(this.weights_ho, hidden); //this is O
+		outputs.add(this.bias_o);
+		outputs.map(sigmoid);
 
 		//calculate the error of the output layer -> error = targets - outputs
-		let output_errors = Matrix.subtract(targets, outputs);
+		let targets = Matrix.fromArray(targetsArray);
+		let output_errors = Matrix.subtract(targets, outputs); //this is Eo
 
 		//calculate the error of the hidden layer
 		//backpropagation -> the error of the hidden layer is a portion of the total error for each weight -> trough some maths we get this formula (the weights matrix has to be transposed to match rows and cols in multiplications)
-		let hidden_errors = Matrix.multiply(Matrix.transpose(this.weights_ho), output_errors);
+		//E[i] = transposed(W[i][i+1])*E[i+1]
+		//applying the formula to hidden layer:
+		//Eh = transposed(Who) • Eo
+		let hidden_errors = Matrix.multiply(Matrix.transpose(this.weights_ho), output_errors); //this is Eh
+
+		//calculate deltas for hidden layer
+		//F1 formula applyed to the output layer:
+		//ΔWho = lr * 		Eo  		*		(O*(1-O))			•		transposed(H)
+		//		      ↑output error↑	 ↑derivative of sigmoid↑		  ↑input of output layer↑
+		// calculating ΔWho = lr * Eo * (O*(1-O)) • transposed(H)
+		// calculate (O*(1-O))
+		let gradients_ho = Matrix.map(outputs, (value) => value * (1 - value));
+		// calculate Eo * (O*(1-O))
+		gradients_ho.scalarMultiply(output_errors);
+		// calculate lr * Eo * (O*(1-O)) = gradient
+		gradients_ho.scalarMultiply(this.learningRate);
+		// calculate transposed(H)
+		let hidden_t = Matrix.transpose(hidden);
+		let weight_ho_deltas = Matrix.multiply(gradients_ho, hidden_t);
+		//apply deltas to weights
+		this.weights_ho.add(weight_ho_deltas);
+
+		// calculate deltas for input layer
+		// ΔWih = lr * Eh * (H*(1-H)) • transposed(I)
+		let gradients_ih = Matrix.map(hidden, (value) => value * (1 - value));
+		gradients_ih.scalarMultiply(hidden_errors);
+		gradients_ih.scalarMultiply(this.learningRate);
+		let inputs_t = Matrix.transpose(inputs);
+		let weight_ih_deltas = Matrix.multiply(gradients_ih, inputs_t);
+		//apply deltas to weights
+		this.weights_ih.add(weight_ih_deltas);
+
+		// calculate deltas for the biases of hidden layer using F2 formula
+		// ΔBo = lr * Eo * (O*(1-O)) -> I already calculated this! just apply the gradients to the biases then
+		this.bias_o.add(gradients_ho);
+		//same for imput layer bias
+		this.bias_h.add(gradients_ih);
 	}
 }
 
 // sigmoid function used as activation function
 const sigmoid = (x) => 1 / (1 + Math.exp(-x));
+
+// first derivative of sigmoid function
+const dSigmoid = (x) => sigmoid(x) * (1 - sigmoid(x));
