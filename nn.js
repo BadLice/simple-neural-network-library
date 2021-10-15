@@ -4,6 +4,8 @@ class NeuralNetwork {
 		this.inputNodes = inputNodes;
 		this.hiddenNodes = hiddenNodes;
 		this.outputNodes = outputNodes;
+		this.activation = sigmoid;
+		this.activationDerivative = dSigmoid;
 
 		//weights between input layer and hidden layer
 		this.weights_ih = new Matrix(this.hiddenNodes, this.inputNodes);
@@ -36,7 +38,7 @@ class NeuralNetwork {
 		//add bias to prevent limit case 0
 		hidden.add(this.bias_h);
 		//activation function
-		hidden.map(sigmoid);
+		hidden.map(this.activation);
 
 		// GENERATING OUTPUT LAYER OUTPUTS
 		// O = sig(W * H + B)
@@ -46,7 +48,7 @@ class NeuralNetwork {
 		// sig -> sigmoid (activation function)
 		let outputs = Matrix.multiply(this.weights_ho, hidden);
 		outputs.add(this.bias_o);
-		outputs.map(sigmoid);
+		outputs.map(this.activation);
 
 		return outputs.toArray();
 	}
@@ -63,10 +65,14 @@ class NeuralNetwork {
 		let inputs = Matrix.fromArray(inputArray);
 		let hidden = Matrix.multiply(this.weights_ih, inputs); //this is H
 		hidden.add(this.bias_h);
-		hidden.map(sigmoid);
+		//save non-activated matrixes to apply derivative next
+		let nonActivatedHidden = hidden.clone();
+		hidden.map(this.activation);
 		let outputs = Matrix.multiply(this.weights_ho, hidden); //this is O
 		outputs.add(this.bias_o);
-		outputs.map(sigmoid);
+		//save non-activated matrixes to apply derivative next
+		let nonActivatedOutputs = outputs.clone();
+		outputs.map(this.activation);
 
 		//calculate the error of the output layer -> error = targets - outputs
 		let targets = Matrix.fromArray(targetsArray);
@@ -85,7 +91,7 @@ class NeuralNetwork {
 		//		      ↑output error↑	 ↑derivative of sigmoid↑		  ↑input of output layer↑
 		// calculating ΔWho = lr * Eo * (O*(1-O)) • transposed(H)
 		// calculate (O*(1-O))
-		let gradients_ho = Matrix.map(outputs, (value) => value * (1 - value));
+		let gradients_ho = Matrix.map(nonActivatedOutputs, this.activationDerivative);
 		// calculate Eo * (O*(1-O))
 		gradients_ho.scalarMultiply(output_errors);
 		// calculate lr * Eo * (O*(1-O)) = gradient
@@ -98,7 +104,7 @@ class NeuralNetwork {
 
 		// calculate deltas for input layer
 		// ΔWih = lr * Eh * (H*(1-H)) • transposed(I)
-		let gradients_ih = Matrix.map(hidden, (value) => value * (1 - value));
+		let gradients_ih = Matrix.map(nonActivatedHidden, this.activationDerivative);
 		gradients_ih.scalarMultiply(hidden_errors);
 		gradients_ih.scalarMultiply(this.learningRate);
 		let inputs_t = Matrix.transpose(inputs);
@@ -111,6 +117,15 @@ class NeuralNetwork {
 		this.bias_o.add(gradients_ho);
 		//same for imput layer bias
 		this.bias_h.add(gradients_ih);
+	}
+
+	setLearningrate(lr) {
+		this.learningRate = lr;
+	}
+
+	setActivationFunction(activation, derivative) {
+		this.activation = activation;
+		this.activationDerivative = derivative;
 	}
 }
 
