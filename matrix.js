@@ -100,8 +100,17 @@ class Matrix {
 	static map(m, callback) {
 		let result = new Matrix(m.rows, m.cols);
 		result.data = result.data.map((row, i) =>
-			row.map((value, j) => callback(m.data[i][j], i, j))
+			row.map((_, j) => callback(m.data[i][j], i, j))
 		);
+		return result;
+	}
+
+	clone() {
+		let result = new Matrix(this.rows, this.cols);
+		result.data.forEach((row, i) =>
+			row.forEach((_, j) => (result.data[i][j] = this.data[i][j]))
+		);
+		// console.log(result.data);
 		return result;
 	}
 
